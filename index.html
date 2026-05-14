@@ -460,6 +460,16 @@
   </div></div>
 </div>
 
+<!-- ══ 緊急超時：在 Firebase 載入之前就設好，不管後面出什麼事都會執行 ══ -->
+<script>
+  window.__loadTimer = setTimeout(function() {
+    var ov = document.getElementById('loadingOverlay');
+    if (ov) ov.style.display = 'none';
+    var t = document.getElementById('toast');
+    if (t) { t.textContent = '⚠️ 無法連線，請重新整理頁面'; t.classList.add('show'); }
+  }, 5000);
+</script>
+
 <!-- ══════ Firebase SDK ══════ -->
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -554,6 +564,7 @@ function checkAllLoaded() {
   if (Object.values(S.loaded).every(Boolean)) {
     document.getElementById('loadingOverlay').classList.add('hidden');
     if (_loadTimeout) { clearTimeout(_loadTimeout); _loadTimeout = null; }
+    if (window.__loadTimer) { clearTimeout(window.__loadTimer); window.__loadTimer = null; }
   }
 }
 function forceHideLoading(reason) {
@@ -1234,14 +1245,4 @@ function openExport() {
   document.getElementById('exportData').value=lines.join('\n');
   openModal('modalExport');
 }
-function doCopy() {
-  const txt=document.getElementById('exportData').value;
-  navigator.clipboard.writeText(txt).then(()=>showToast('已複製到剪貼簿！')).catch(()=>{
-    document.getElementById('exportData').select(); document.execCommand('copy'); showToast('已複製到剪貼簿！');
-  });
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Boot
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-S.isAdmin = !!se
+function doCo
