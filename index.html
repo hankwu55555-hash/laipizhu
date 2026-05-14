@@ -295,6 +295,7 @@
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div>
   <div class="loading-text">連線中…</div>
+  <div style="font-size:12px;color:#9ca3af;margin-top:4px">若持續顯示請重新整理</div>
 </div>
 
 <!-- ══ Toast ══ -->
@@ -1243,9 +1244,4 @@ function doCopy() {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  Boot
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-S.isAdmin = !!sessionStorage.getItem(SESSION_KEY);
-updateAdminUI();
-startListening();
-</script>
-</body>
-</html>
+S.isAdmin = !!se
