@@ -548,51 +548,83 @@ function setBtn(id, txt, disabled) {
 //  Real-time listeners
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 let _unsubs = [];
+let _loadTimeout = null;
 function checkAllLoaded() {
-  if (Object.values(S.loaded).every(Boolean))
+  if (Object.values(S.loaded).every(Boolean)) {
     document.getElementById('loadingOverlay').classList.add('hidden');
+    if (_loadTimeout) { clearTimeout(_loadTimeout); _loadTimeout = null; }
+  }
+}
+function forceHideLoading(reason) {
+  document.getElementById('loadingOverlay').classList.add('hidden');
+  if (reason) showToast(reason);
 }
 
 function startListening() {
   _unsubs.forEach(u => u());
-  _unsubs = [
-    COL.events.onSnapshot(snap => {
-      S.events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      S.loaded.events = true; checkAllLoaded(); render();
-    }, err => { console.error(err); showToast('載入活動失敗，請重新整理'); }),
+  _unsubs = [];
 
-    COL.venues.onSnapshot(snap => {
-      S.venues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      S.loaded.venues = true; checkAllLoaded(); render();
-    }),
+  // 10 秒超時保險：不管有沒有載完，都強制隱藏 loading
+  if (_loadTimeout) clearTimeout(_loadTimeout);
+  _loadTimeout = setTimeout(() => {
+    if (!Object.values(S.loaded).every(Boolean)) {
+      console.warn('載入超時，強制顯示頁面');
+      forceHideLoading('連線逾時，部分資料可能未載入，請重新整理');
+    }
+  }, 10000);
 
-    COL.courses.onSnapshot(snap => {
-      S.courses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      S.loaded.courses = true; checkAllLoaded(); render();
-    }),
+  _unsubs.push(COL.events.onSnapshot(snap => {
+    S.events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    S.loaded.events = true; checkAllLoaded(); render();
+  }, err => {
+    console.error('events error', err);
+    S.loaded.events = true; checkAllLoaded();
+    showToast('載入活動失敗，請確認網路連線');
+  }));
 
-    COL.regs.onSnapshot(snap => {
-      S.signups = {};
-      snap.docs.forEach(d => {
-        const data = d.data();
-        if (!S.signups[data.itemId]) S.signups[data.itemId] = [];
-        S.signups[data.itemId].push({ id: d.id, ...data });
-      });
-      // Sort each list by createdAt
-      Object.keys(S.signups).forEach(k => {
-        S.signups[k].sort((a, b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
-      });
-      S.loaded.regs = true; checkAllLoaded(); render();
-      // If detail modal is open, refresh its list
-      if (S.detailId && !document.getElementById('modalDetail').classList.contains('hidden'))
-        refreshDetailList();
-      // If edit modal is open, refresh admin list
-      if (S.editEvId && !document.getElementById('modalEvent').classList.contains('hidden'))
-        renderAdminSignupList(S.editEvId, 'evSignupList');
-      if (S.editCoId && !document.getElementById('modalCourse').classList.contains('hidden'))
-        renderAdminSignupList(S.editCoId, 'coSignupList');
-    }),
-  ];
+  _unsubs.push(COL.venues.onSnapshot(snap => {
+    S.venues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    S.loaded.venues = true; checkAllLoaded(); render();
+  }, err => {
+    console.error('venues error', err);
+    S.loaded.venues = true; checkAllLoaded();
+    showToast('載入場地失敗，請確認網路連線');
+  }));
+
+  _unsubs.push(COL.courses.onSnapshot(snap => {
+    S.courses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    S.loaded.courses = true; checkAllLoaded(); render();
+  }, err => {
+    console.error('courses error', err);
+    S.loaded.courses = true; checkAllLoaded();
+    showToast('載入課程失敗，請確認網路連線');
+  }));
+
+  _unsubs.push(COL.regs.onSnapshot(snap => {
+    S.signups = {};
+    snap.docs.forEach(d => {
+      const data = d.data();
+      if (!S.signups[data.itemId]) S.signups[data.itemId] = [];
+      S.signups[data.itemId].push({ id: d.id, ...data });
+    });
+    // Sort each list by createdAt
+    Object.keys(S.signups).forEach(k => {
+      S.signups[k].sort((a, b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
+    });
+    S.loaded.regs = true; checkAllLoaded(); render();
+    // If detail modal is open, refresh its list
+    if (S.detailId && !document.getElementById('modalDetail').classList.contains('hidden'))
+      refreshDetailList();
+    // If edit modal is open, refresh admin list
+    if (S.editEvId && !document.getElementById('modalEvent').classList.contains('hidden'))
+      renderAdminSignupList(S.editEvId, 'evSignupList');
+    if (S.editCoId && !document.getElementById('modalCourse').classList.contains('hidden'))
+      renderAdminSignupList(S.editCoId, 'coSignupList');
+  }, err => {
+    console.error('regs error', err);
+    S.loaded.regs = true; checkAllLoaded();
+    showToast('載入報名資料失敗，請確認網路連線');
+  }));
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1182,4 +1214,38 @@ function askClear() {
   };
   openModal('modalConfirm');
 }
-function onConfirmOk() { closeModal('modalConfir
+function onConfirmOk() { closeModal('modalConfirm'); if(S.confirmCb){S.confirmCb();S.confirmCb=null;} }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Export (CSV + JSON)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openExport() {
+  // Build a CSV-friendly text of all sign-ups
+  const lines=['活動/課程\t日期\t姓名\t備註\t報名時間'];
+  S.events.forEach(e => {
+    const vn=S.venues.find(v=>v.id===e.venueId);
+    const nm=vn?vn.name:'活動';
+    (S.signups[e.id]||[]).forEach(r=>lines.push(`🏸 ${nm}\t${e.date||''}\t${r.name}\t${r.note||''}\t${fmtTs(r.createdAt)}`));
+  });
+  S.courses.forEach(c => {
+    (S.signups[c.id]||[]).forEach(r=>lines.push(`📚 ${c.courseName}\t${c.date||''}\t${r.name}\t${r.note||''}\t${fmtTs(r.createdAt)}`));
+  });
+  document.getElementById('exportData').value=lines.join('\n');
+  openModal('modalExport');
+}
+function doCopy() {
+  const txt=document.getElementById('exportData').value;
+  navigator.clipboard.writeText(txt).then(()=>showToast('已複製到剪貼簿！')).catch(()=>{
+    document.getElementById('exportData').select(); document.execCommand('copy'); showToast('已複製到剪貼簿！');
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Boot
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+S.isAdmin = !!sessionStorage.getItem(SESSION_KEY);
+updateAdminUI();
+startListening();
+</script>
+</body>
+</html>
