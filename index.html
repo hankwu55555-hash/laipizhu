@@ -1,0 +1,1188 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="賴皮朱">
+  <meta name="theme-color" content="#db2777">
+  <title>賴皮朱 · 羽球活動管理</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --pink:        #db2777;
+      --pink-dark:   #be185d;
+      --pink-light:  #fce7f3;
+      --pink-bg:     #fdf2f8;
+      --pink-border: #f9a8d4;
+      --text:        #1f2937;
+      --muted:       #6b7280;
+      --border:      #e5e7eb;
+      --white:       #ffffff;
+      --green:       #16a34a;
+      --green-bg:    #dcfce7;
+      --red:         #ef4444;
+      --red-bg:      #fee2e2;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Noto Sans TC', sans-serif;
+      background: var(--pink-bg); color: var(--text);
+      min-height: 100vh; max-width: 480px; margin: 0 auto;
+    }
+
+    /* ── Loading overlay ── */
+    .loading-overlay {
+      position: fixed; inset: 0; background: var(--pink-bg);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 9999; gap: 16px;
+    }
+    .loading-overlay.hidden { display: none; }
+    .spinner {
+      width: 40px; height: 40px; border: 3px solid var(--pink-light);
+      border-top-color: var(--pink); border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { font-size: 14px; color: var(--muted); }
+
+    /* ── Header ── */
+    .header {
+      background: var(--white); padding: 14px 16px 10px;
+      text-align: center; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+    .header-title { font-size: 22px; font-weight: 800; color: var(--pink); flex: 1; text-align: center; }
+    .lock-btn {
+      width: 36px; height: 36px; border-radius: 50%;
+      border: none; background: var(--pink-light); color: var(--pink);
+      font-size: 16px; cursor: pointer; transition: background .2s;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .lock-btn.admin { background: var(--pink); color: var(--white); }
+    .admin-badge {
+      display: inline-block; background: var(--pink); color: var(--white);
+      font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+      margin-bottom: 4px; letter-spacing: 1px;
+    }
+    .header-sub { font-size: 11px; color: var(--muted); letter-spacing: 3px; margin-bottom: 10px; }
+    .view-toggle { display: flex; gap: 8px; justify-content: center; }
+    .view-btn {
+      padding: 6px 20px; border-radius: 20px;
+      border: 1px solid var(--pink-border); background: var(--white); color: var(--pink);
+      font-size: 14px; cursor: pointer; transition: all .2s;
+    }
+    .view-btn.active { background: var(--pink); color: var(--white); border-color: var(--pink); }
+
+    /* ── Main ── */
+    .main { padding: 12px 12px 84px; }
+
+    /* ── Section header ── */
+    .sec { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 8px; }
+    .sec-t { font-size: 15px; font-weight: 600; }
+    .sec-c { font-size: 13px; color: var(--muted); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--white); border-radius: 14px; padding: 14px;
+      margin-bottom: 8px; box-shadow: 0 1px 4px rgba(0,0,0,.07);
+      cursor: pointer; transition: box-shadow .2s;
+    }
+    .card:hover { box-shadow: 0 2px 10px rgba(219,39,119,.18); }
+    .crow { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+    .ctitle { font-size: 15px; font-weight: 600; }
+    .cdate  { font-size: 13px; color: var(--pink); font-weight: 500; }
+    .cmeta  { font-size: 12px; color: var(--muted); }
+    .tags   { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px; }
+    .tag {
+      display: inline-block; padding: 2px 8px; border-radius: 10px;
+      font-size: 11px; font-weight: 500;
+      background: var(--pink-light); color: var(--pink);
+    }
+    .tag.free    { background: var(--green-bg); color: var(--green); }
+    .tag.indoor  { background: #e0f2fe; color: #0284c7; }
+    .tag.outdoor { background: #fef9c3; color: #ca8a04; }
+    .tag.full    { background: var(--red-bg); color: var(--red); }
+    .signup-bar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border);
+    }
+    .signup-count { font-size: 12px; color: var(--muted); }
+    .signup-pill {
+      font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 10px;
+      background: var(--pink-light); color: var(--pink);
+    }
+    .signup-pill.full { background: var(--red-bg); color: var(--red); }
+
+    /* ── Empty ── */
+    .empty { text-align: center; padding: 36px 16px; color: var(--muted); font-size: 14px; line-height: 1.9; }
+
+    /* ── Calendar ── */
+    .cal-wrap { background: var(--white); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+    .cal-nav  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+    .cal-btn  { background: none; border: none; font-size: 18px; color: var(--pink); cursor: pointer; padding: 4px 8px; }
+    .cal-lbl  { font-weight: 600; font-size: 15px; }
+    .cal-today-btn { font-size: 13px; padding: 4px 12px; border: 1px solid var(--pink-border); border-radius: 12px; background: none; color: var(--pink); cursor: pointer; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+    .cal-dow  { text-align: center; font-size: 12px; color: var(--muted); padding: 4px; font-weight: 500; }
+    .cal-day  {
+      text-align: center; padding: 7px 2px; border-radius: 8px;
+      font-size: 13px; cursor: pointer; transition: background .15s; position: relative;
+    }
+    .cal-day:hover:not(.empty) { background: var(--pink-light); }
+    .cal-day.empty { cursor: default; }
+    .cal-day.today { color: var(--pink); font-weight: 700; }
+    .cal-day.has-event::after {
+      content: ''; display: block; width: 5px; height: 5px;
+      background: var(--pink); border-radius: 50%; margin: 2px auto 0;
+    }
+    .cal-day.selected { background: var(--pink); color: var(--white); }
+    .cal-day.selected::after { background: var(--white); }
+    .cal-events { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); }
+
+    /* ── Admin panel ── */
+    .admin-row {
+      display: flex; align-items: center; justify-content: space-between;
+      background: var(--white); border-radius: 14px; padding: 14px 16px;
+      margin-bottom: 8px; cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,.07);
+    }
+    .admin-left { display: flex; align-items: center; gap: 12px; }
+    .admin-icon { font-size: 22px; }
+    .admin-lbl  { font-size: 15px; font-weight: 500; }
+    .admin-desc { font-size: 12px; color: var(--muted); }
+
+    /* ── FAB ── */
+    .fab {
+      position: fixed; bottom: calc(68px + env(safe-area-inset-bottom));
+      right: max(16px, calc(50% - 224px));
+      width: 52px; height: 52px; border-radius: 50%;
+      background: var(--pink); color: var(--white);
+      border: none; font-size: 26px; cursor: pointer;
+      box-shadow: 0 4px 14px rgba(219,39,119,.45);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 300; transition: background .2s;
+    }
+    .fab:hover { background: var(--pink-dark); }
+
+    /* ── Bottom Nav ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+      width: 100%; max-width: 480px;
+      background: var(--white); border-top: 1px solid var(--border);
+      display: flex; z-index: 200; padding-bottom: env(safe-area-inset-bottom);
+    }
+    .nav-btn {
+      flex: 1; display: flex; flex-direction: column; align-items: center;
+      padding: 8px 0 6px; border: none; background: none;
+      color: var(--muted); font-size: 11px; gap: 2px; cursor: pointer; transition: color .2s;
+    }
+    .nav-btn.active { color: var(--pink); }
+    .nav-icon { font-size: 20px; }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5);
+      z-index: 500; display: flex; align-items: flex-end; justify-content: center;
+    }
+    .modal-overlay.hidden { display: none !important; }
+    .mbox {
+      background: var(--white); border-radius: 20px 20px 0 0;
+      width: 100%; max-width: 480px; max-height: 92vh; overflow-y: auto;
+      padding: 20px 16px calc(24px + env(safe-area-inset-bottom));
+    }
+    .mhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .mtitle { font-size: 18px; font-weight: 700; }
+    .mclose { background: none; border: none; font-size: 22px; color: var(--muted); cursor: pointer; padding: 2px 6px; }
+
+    /* ── Form ── */
+    .fg  { margin-bottom: 14px; }
+    .fl  { display: block; font-size: 13px; font-weight: 500; color: var(--muted); margin-bottom: 4px; }
+    .fi  {
+      width: 100%; border: 1px solid var(--border); border-radius: 10px;
+      padding: 10px 12px; font-size: 15px; outline: none;
+      font-family: inherit; transition: border-color .2s; background: var(--white);
+    }
+    .fi:focus { border-color: var(--pink); }
+    select.fi {
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 12px center; padding-right: 34px;
+    }
+    textarea.fi { min-height: 100px; resize: vertical; font-size: 13px; font-family: monospace; }
+    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .fhint { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .ftoggle { display: flex; gap: 8px; }
+    .ttbtn {
+      flex: 1; padding: 9px; border: 1px solid var(--border); border-radius: 10px;
+      background: var(--white); font-size: 14px; cursor: pointer; transition: all .2s; font-family: inherit;
+    }
+    .ttbtn.active { border-color: var(--pink); background: var(--pink-light); color: var(--pink); font-weight: 600; }
+    .ck-lbl { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+    input[type=checkbox] { accent-color: var(--pink); width: 16px; height: 16px; }
+
+    /* buttons */
+    .btn-main {
+      width: 100%; padding: 14px; background: var(--pink); color: var(--white);
+      border: none; border-radius: 12px; font-size: 16px; font-weight: 600;
+      cursor: pointer; margin-top: 8px; font-family: inherit; transition: background .2s;
+    }
+    .btn-main:hover:not(:disabled) { background: var(--pink-dark); }
+    .btn-main:disabled { opacity: .6; cursor: not-allowed; }
+    .btn-del {
+      width: 100%; padding: 12px; background: none; color: var(--red);
+      border: 1px solid #fca5a5; border-radius: 12px; font-size: 15px;
+      cursor: pointer; margin-top: 8px; font-family: inherit;
+    }
+    .btn-outline {
+      width: 100%; padding: 12px; background: var(--pink-light); color: var(--pink);
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 500;
+      cursor: pointer; margin-top: 8px; font-family: inherit;
+    }
+    .btn-ghost {
+      padding: 8px 16px; background: none; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 8px; font-size: 14px;
+      cursor: pointer; font-family: inherit;
+    }
+
+    /* sign-up list */
+    .signup-list { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+    .signup-list-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
+    .signup-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px; background: var(--pink-bg); border-radius: 10px; margin-bottom: 6px;
+    }
+    .signup-name { font-size: 14px; font-weight: 500; }
+    .signup-note { font-size: 12px; color: var(--muted); }
+    .signup-time { font-size: 11px; color: var(--muted); white-space: nowrap; margin-left: 8px; }
+    .signup-del { background: none; border: none; color: var(--red); font-size: 18px; cursor: pointer; padding: 2px 6px; }
+
+    /* detail info */
+    .info-row { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+    .info-label { color: var(--muted); min-width: 72px; flex-shrink: 0; }
+    .info-value { font-weight: 500; word-break: break-all; }
+    .cap-bar-wrap { height: 6px; background: var(--border); border-radius: 3px; margin-top: 8px; overflow: hidden; }
+    .cap-bar { height: 100%; background: var(--pink); border-radius: 3px; transition: width .4s; }
+    .cap-bar.full { background: var(--red); }
+
+    /* confirm / auth */
+    .cbox { text-align: center; }
+    .cbox h3 { font-size: 17px; margin-bottom: 8px; }
+    .cbox p  { color: var(--muted); font-size: 14px; margin-bottom: 20px; line-height: 1.6; }
+    .cbns { display: flex; gap: 10px; }
+    .cbns button { flex: 1; padding: 12px; border-radius: 10px; font-size: 15px; cursor: pointer; font-family: inherit; border: none; }
+    .btn-cancel  { background: var(--border); color: var(--text); }
+    .btn-confirm { background: var(--red); color: var(--white); }
+    .auth-icon { font-size: 40px; text-align: center; margin-bottom: 8px; }
+    .auth-lbl  { font-size: 12px; color: var(--muted); text-align: center; margin-bottom: 16px; }
+
+    /* toast */
+    .toast {
+      position: fixed; bottom: calc(90px + env(safe-area-inset-bottom));
+      left: 50%; transform: translateX(-50%);
+      background: #1f2937; color: var(--white); font-size: 14px;
+      padding: 10px 20px; border-radius: 20px; z-index: 999;
+      opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<!-- ══ Loading ══ -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text">連線中…</div>
+</div>
+
+<!-- ══ Toast ══ -->
+<div class="toast" id="toast"></div>
+
+<!-- ══ Header ══ -->
+<header class="header">
+  <div class="header-top">
+    <div style="width:36px"></div>
+    <div>
+      <div id="adminBadge" class="admin-badge hidden">主辦人模式</div>
+      <div class="header-title">🏸 賴皮朱</div>
+    </div>
+    <button class="lock-btn" id="lockBtn" onclick="onLockClick()">🔒</button>
+  </div>
+  <div class="header-sub">羽 球 活 動 管 理</div>
+  <div class="view-toggle">
+    <button class="view-btn active" onclick="setView('list')">📋 列表</button>
+    <button class="view-btn"       onclick="setView('calendar')">📆 月曆</button>
+  </div>
+</header>
+
+<!-- ══ Main ══ -->
+<main class="main" id="mainContent"></main>
+
+<!-- ══ FAB ══ -->
+<button class="fab hidden" id="fab" onclick="onFab()">＋</button>
+
+<!-- ══ Bottom Nav ══ -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-events"  onclick="setTab('events')"><span class="nav-icon">📅</span>活動</button>
+  <button class="nav-btn"        id="nav-venues"  onclick="setTab('venues')"><span class="nav-icon">📍</span>場地</button>
+  <button class="nav-btn"        id="nav-courses" onclick="setTab('courses')"><span class="nav-icon">📚</span>課程</button>
+  <button class="nav-btn hidden" id="nav-admin"   onclick="setTab('admin')"><span class="nav-icon">⚙️</span>主辦</button>
+</nav>
+
+<!-- ══════ ADMIN MODALS ══════ -->
+
+<!-- Modal: Event -->
+<div class="modal-overlay hidden" id="modalEvent">
+  <div class="mbox">
+    <div class="mhead"><h2 class="mtitle" id="mEvTitle">建立新活動</h2><button class="mclose" onclick="closeModal('modalEvent')">×</button></div>
+    <div class="fg"><label class="fl">場地</label><select class="fi" id="evVenue" onchange="onVenueChange()"><option value="">請選擇場地</option></select></div>
+    <div class="fg"><label class="fl">總召姓名 *</label><input class="fi" type="text" id="evOrg" placeholder="輸入姓名"><p class="fhint">會自動記住，下次建立活動會預先填入</p></div>
+    <div class="fg"><label class="fl">日期</label><input class="fi" type="date" id="evDate"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">開始時間</label><input class="fi" type="time" id="evStart"></div>
+      <div class="fg"><label class="fl">結束時間</label><input class="fi" type="time" id="evEnd"></div>
+    </div>
+    <div class="fg"><label class="fl">總場地費（NT$）</label><input class="fi" type="number" id="evFee" placeholder="0" min="0"><p class="fhint">免費場地請輸入 0</p></div>
+    <div class="fg"><label class="fl">人數上限</label><input class="fi" type="number" id="evLimit" placeholder="0" min="0"><p class="fhint">填 0 代表不限制</p></div>
+    <div class="fg"><label class="fl">備註（選填）</label><input class="fi" type="text" id="evNote" placeholder="輸入備註"></div>
+    <button class="btn-main" id="saveEvBtn" onclick="saveEvent()">儲存活動</button>
+    <button class="btn-del hidden" id="btnDelEv" onclick="confirmDel('event')">刪除此活動</button>
+    <div class="signup-list" id="evSignupList"></div>
+  </div>
+</div>
+
+<!-- Modal: Venue -->
+<div class="modal-overlay hidden" id="modalVenue">
+  <div class="mbox">
+    <div class="mhead"><h2 class="mtitle" id="mVnTitle">新增場地</h2><button class="mclose" onclick="closeModal('modalVenue')">×</button></div>
+    <div class="fg"><label class="fl">場地名稱 *</label><input class="fi" type="text" id="vnName" placeholder="例：XX 羽球館"></div>
+    <div class="fg"><label class="fl">地址</label><input class="fi" type="text" id="vnAddr" placeholder="輸入地址"></div>
+    <div class="fg"><label class="fl">類型</label><div class="ftoggle"><button class="ttbtn active" id="ttIndoor" onclick="setVType('indoor')">🏠 室內</button><button class="ttbtn" id="ttOutdoor" onclick="setVType('outdoor')">🌳 室外</button></div></div>
+    <div class="fg"><label class="fl">場地費用（顯示文字）</label><input class="fi" type="text" id="vnFeeText" placeholder="例：每人 NT$150"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">預設總場地費（NT$）</label><input class="fi" type="number" id="vnDefFee" placeholder="0" min="0"><p class="fhint">建立活動時的預填值</p></div>
+      <div class="fg"><label class="fl">預設人數上限</label><input class="fi" type="number" id="vnDefLimit" placeholder="0" min="0"><p class="fhint">建立活動時的預填值</p></div>
+    </div>
+    <div class="fg"><label class="fl">是否免費</label><label class="ck-lbl"><input type="checkbox" id="vnFree"> 💰 標記為免費場地（卡片上顯示「免費」標籤）</label></div>
+    <div class="fg"><label class="fl">人數限制（顯示文字）</label><input class="fi" type="text" id="vnLimitText" placeholder="例：最多 20 人"></div>
+    <div class="fg"><label class="fl">備註（選填）</label><input class="fi" type="text" id="vnNote" placeholder="輸入備註"></div>
+    <button class="btn-main" id="saveVnBtn" onclick="saveVenue()">儲存場地</button>
+    <button class="btn-del hidden" id="btnDelVn" onclick="confirmDel('venue')">刪除此場地</button>
+  </div>
+</div>
+
+<!-- Modal: Course -->
+<div class="modal-overlay hidden" id="modalCourse">
+  <div class="mbox">
+    <div class="mhead"><h2 class="mtitle" id="mCoTitle">新增課程</h2><button class="mclose" onclick="closeModal('modalCourse')">×</button></div>
+    <div class="fg"><label class="fl">總召姓名 *</label><input class="fi" type="text" id="coOrg" placeholder="輸入姓名"><p class="fhint">會自動記住，下次建立會預先填入</p></div>
+    <div class="fg"><label class="fl">課程名稱 *</label><input class="fi" type="text" id="coName" placeholder="例：羽球初階課程"></div>
+    <div class="fg"><label class="fl">課程連結（選填）</label><input class="fi" type="url" id="coLink" placeholder="https://..."><p class="fhint">可放 Google Form、報名網址或課程介紹</p></div>
+    <div class="fg"><label class="fl">日期</label><input class="fi" type="date" id="coDate"></div>
+    <div class="frow">
+      <div class="fg"><label class="fl">開始時間</label><input class="fi" type="time" id="coStart"></div>
+      <div class="fg"><label class="fl">結束時間</label><input class="fi" type="time" id="coEnd"></div>
+    </div>
+    <div class="fg"><label class="fl">報名費用（NT$）</label><input class="fi" type="number" id="coFee" placeholder="0" min="0"><p class="fhint">每人費用，免費請填 0</p></div>
+    <div class="fg"><label class="fl">人數上限</label><input class="fi" type="number" id="coLimit" placeholder="0" min="0"><p class="fhint">填 0 代表不限制</p></div>
+    <div class="fg"><label class="fl">備註（選填）</label><input class="fi" type="text" id="coNote" placeholder="輸入備註"></div>
+    <button class="btn-main" id="saveCoBtn" onclick="saveCourse()">儲存課程</button>
+    <button class="btn-del hidden" id="btnDelCo" onclick="confirmDel('course')">刪除此課程</button>
+    <div class="signup-list" id="coSignupList"></div>
+  </div>
+</div>
+
+<!-- Modal: Export -->
+<div class="modal-overlay hidden" id="modalExport">
+  <div class="mbox">
+    <div class="mhead"><h2 class="mtitle">匯出活動資料</h2><button class="mclose" onclick="closeModal('modalExport')">×</button></div>
+    <div class="fg"><label class="fl">複製以下內容妥善保存</label><textarea class="fi" id="exportData" readonly></textarea></div>
+    <button class="btn-outline" onclick="doCopy()">複製到剪貼簿</button>
+  </div>
+</div>
+
+<!-- ══════ PARTICIPANT MODALS ══════ -->
+
+<!-- Modal: Detail + Sign-up -->
+<div class="modal-overlay hidden" id="modalDetail">
+  <div class="mbox">
+    <div class="mhead"><h2 class="mtitle" id="detailTitle">活動詳情</h2><button class="mclose" onclick="closeModal('modalDetail')">×</button></div>
+    <div id="detailInfo"></div>
+    <div id="signupSection" style="margin-top:16px">
+      <div style="font-size:15px;font-weight:600;margin-bottom:12px" id="signupSectionTitle">我要報名</div>
+      <div class="fg"><label class="fl">您的姓名 *</label><input class="fi" type="text" id="signupName" placeholder="輸入您的姓名"></div>
+      <div class="fg"><label class="fl">備註（選填）</label><input class="fi" type="text" id="signupNote" placeholder="飲食限制、特別說明…"></div>
+      <button class="btn-main" id="signupBtn" onclick="doSignup()">✅ 確認報名</button>
+    </div>
+    <div class="signup-list hidden" id="detailSignupList"></div>
+  </div>
+</div>
+
+<!-- Modal: Auth -->
+<div class="modal-overlay hidden" id="modalAuth">
+  <div class="mbox">
+    <div class="mhead"><h2 class="mtitle" id="authTitle">主辦人登入</h2><button class="mclose" onclick="closeModal('modalAuth')">×</button></div>
+    <div class="auth-icon" id="authIcon">🔒</div>
+    <div class="auth-lbl" id="authLbl">輸入主辦人密碼以進入管理模式</div>
+    <div class="fg hidden" id="authNewPwWrap"><label class="fl">設定新密碼 *</label><input class="fi" type="password" id="authNewPw" placeholder="至少 4 個字元"></div>
+    <div class="fg hidden" id="authConfirmWrap"><label class="fl">確認密碼 *</label><input class="fi" type="password" id="authConfirmPw" placeholder="再次輸入密碼"></div>
+    <div class="fg" id="authPwWrap"><label class="fl">密碼</label><input class="fi" type="password" id="authPw" placeholder="輸入主辦人密碼" onkeydown="if(event.key==='Enter')onAuthSubmit()"></div>
+    <div id="authError" style="color:var(--red);font-size:13px;margin-bottom:8px;display:none"></div>
+    <button class="btn-main" onclick="onAuthSubmit()" id="authSubmitBtn">登入</button>
+    <div style="margin-top:12px;text-align:center"><button class="btn-ghost" onclick="closeModal('modalAuth')">取消</button></div>
+  </div>
+</div>
+
+<!-- Modal: Logout -->
+<div class="modal-overlay hidden" id="modalLogout">
+  <div class="mbox"><div class="cbox">
+    <div style="font-size:36px;margin-bottom:8px">🔓</div>
+    <h3>退出主辦人模式？</h3>
+    <p>退出後將切換回參加者視角，<br>需重新輸入密碼才能管理活動。</p>
+    <div class="cbns">
+      <button class="btn-cancel" onclick="closeModal('modalLogout')">取消</button>
+      <button class="btn-confirm" style="background:var(--pink)" onclick="doLogout()">退出</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- Modal: Confirm -->
+<div class="modal-overlay hidden" id="modalConfirm">
+  <div class="mbox"><div class="cbox">
+    <h3>確認</h3><p id="confirmMsg">確定要執行此操作嗎？</p>
+    <div class="cbns">
+      <button class="btn-cancel" onclick="closeModal('modalConfirm')">取消</button>
+      <button class="btn-confirm" onclick="onConfirmOk()">確定</button>
+    </div>
+  </div></div>
+</div>
+
+<!-- ══════ Firebase SDK ══════ -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+<script>
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Firebase 初始化
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const firebaseConfig = {
+  apiKey:            "AIzaSyCVyvsx4Qr4OZaVwaOSnIaS0oRlyKEqMXc",
+  authDomain:        "project-4587117370328931917.firebaseapp.com",
+  projectId:         "project-4587117370328931917",
+  storageBucket:     "project-4587117370328931917.firebasestorage.app",
+  messagingSenderId: "671201680581",
+  appId:             "1:671201680581:web:de5c6e5dbe8961efdf24ac",
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Collections
+const COL = {
+  events:  db.collection('events'),
+  venues:  db.collection('venues'),
+  courses: db.collection('courses'),
+  regs:    db.collection('registrations'),
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  State
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+const K = { organizer: 'lpz_organizer', password: 'lpz_password' };
+const SESSION_KEY = 'lpz_admin_session';
+
+const S = {
+  isAdmin:    false,
+  tab:        'events',
+  view:       'list',
+  calMonth:   new Date(),
+  calSel:     null,
+  events:     [],
+  venues:     [],
+  courses:    [],
+  signups:    {},   // { itemId: [{id, name, note, createdAt, ...}] }
+  loaded:     { events: false, venues: false, courses: false, regs: false },
+  editEvId:   null,
+  editVnId:   null,
+  editCoId:   null,
+  detailId:   null,
+  detailType: null,
+  vType:      'indoor',
+  confirmCb:  null,
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Helpers
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function uid()  { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
+function fmtDate(ds) {
+  if (!ds) return '';
+  const d = new Date(ds + 'T00:00:00');
+  return `${d.getMonth()+1}/${d.getDate()}（${'日一二三四五六'[d.getDay()]}）`;
+}
+function fmtTime(ts) { return ts ? ts.slice(0,5) : ''; }
+function fmtTs(ts) {
+  if (!ts) return '';
+  const d = ts.toDate ? ts.toDate() : new Date(ts);
+  return d.toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+function today0() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function signupCount(id)  { return (S.signups[id] || []).length; }
+function isFull(id, limit) { const l=parseInt(limit)||0; return l>0 && signupCount(id)>=l; }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function setBtn(id, txt, disabled) {
+  const b = document.getElementById(id);
+  if (!b) return;
+  b.textContent = txt; b.disabled = !!disabled;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Real-time listeners
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+let _unsubs = [];
+function checkAllLoaded() {
+  if (Object.values(S.loaded).every(Boolean))
+    document.getElementById('loadingOverlay').classList.add('hidden');
+}
+
+function startListening() {
+  _unsubs.forEach(u => u());
+  _unsubs = [
+    COL.events.onSnapshot(snap => {
+      S.events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      S.loaded.events = true; checkAllLoaded(); render();
+    }, err => { console.error(err); showToast('載入活動失敗，請重新整理'); }),
+
+    COL.venues.onSnapshot(snap => {
+      S.venues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      S.loaded.venues = true; checkAllLoaded(); render();
+    }),
+
+    COL.courses.onSnapshot(snap => {
+      S.courses = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      S.loaded.courses = true; checkAllLoaded(); render();
+    }),
+
+    COL.regs.onSnapshot(snap => {
+      S.signups = {};
+      snap.docs.forEach(d => {
+        const data = d.data();
+        if (!S.signups[data.itemId]) S.signups[data.itemId] = [];
+        S.signups[data.itemId].push({ id: d.id, ...data });
+      });
+      // Sort each list by createdAt
+      Object.keys(S.signups).forEach(k => {
+        S.signups[k].sort((a, b) => (a.createdAt?.seconds||0) - (b.createdAt?.seconds||0));
+      });
+      S.loaded.regs = true; checkAllLoaded(); render();
+      // If detail modal is open, refresh its list
+      if (S.detailId && !document.getElementById('modalDetail').classList.contains('hidden'))
+        refreshDetailList();
+      // If edit modal is open, refresh admin list
+      if (S.editEvId && !document.getElementById('modalEvent').classList.contains('hidden'))
+        renderAdminSignupList(S.editEvId, 'evSignupList');
+      if (S.editCoId && !document.getElementById('modalCourse').classList.contains('hidden'))
+        renderAdminSignupList(S.editCoId, 'coSignupList');
+    }),
+  ];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Tab / View
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function setTab(t) {
+  S.tab = t;
+  ['events','venues','courses','admin'].forEach(x =>
+    document.getElementById('nav-'+x).classList.toggle('active', x===t));
+  render();
+}
+function setView(v) {
+  S.view = v;
+  document.querySelectorAll('.view-btn').forEach((b,i) =>
+    b.classList.toggle('active', (i===0&&v==='list')||(i===1&&v==='calendar')));
+  render();
+}
+function onFab() {
+  if (S.tab==='events')  openEvModal();
+  if (S.tab==='venues')  openVnModal();
+  if (S.tab==='courses') openCoModal();
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Auth
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function hasPassword() { return !!localStorage.getItem(K.password); }
+function checkPw(pw)   { return localStorage.getItem(K.password) === pw; }
+function setPw(pw)     { localStorage.setItem(K.password, pw); }
+
+function onLockClick() {
+  if (S.isAdmin) { openModal('modalLogout'); return; }
+  openAuthModal();
+}
+function openAuthModal() {
+  document.getElementById('authError').style.display = 'none';
+  document.getElementById('authPw').value = '';
+  if (!hasPassword()) {
+    document.getElementById('authTitle').textContent = '設定主辦人密碼';
+    document.getElementById('authIcon').textContent  = '🔑';
+    document.getElementById('authLbl').textContent   = '首次使用，請設定主辦人密碼';
+    document.getElementById('authPwWrap').classList.add('hidden');
+    document.getElementById('authNewPwWrap').classList.remove('hidden');
+    document.getElementById('authConfirmWrap').classList.remove('hidden');
+    document.getElementById('authNewPw').value = '';
+    document.getElementById('authConfirmPw').value = '';
+    document.getElementById('authSubmitBtn').textContent = '設定密碼';
+  } else {
+    document.getElementById('authTitle').textContent = '主辦人登入';
+    document.getElementById('authIcon').textContent  = '🔒';
+    document.getElementById('authLbl').textContent   = '輸入主辦人密碼以進入管理模式';
+    document.getElementById('authPwWrap').classList.remove('hidden');
+    document.getElementById('authNewPwWrap').classList.add('hidden');
+    document.getElementById('authConfirmWrap').classList.add('hidden');
+    document.getElementById('authSubmitBtn').textContent = '登入';
+  }
+  openModal('modalAuth');
+  setTimeout(() => { try { (hasPassword() ? document.getElementById('authPw') : document.getElementById('authNewPw')).focus(); } catch(e){} }, 300);
+}
+function onAuthSubmit() {
+  const errEl = document.getElementById('authError');
+  errEl.style.display = 'none';
+  if (!hasPassword()) {
+    const np = document.getElementById('authNewPw').value;
+    const cp = document.getElementById('authConfirmPw').value;
+    if (!np) { showAuthErr('請輸入密碼'); return; }
+    if (np.length < 4) { showAuthErr('密碼至少需要 4 個字元'); return; }
+    if (np !== cp)  { showAuthErr('兩次密碼不一致'); return; }
+    setPw(np); doLogin();
+  } else {
+    const pw = document.getElementById('authPw').value;
+    if (!checkPw(pw)) { showAuthErr('密碼錯誤，請重試'); return; }
+    doLogin();
+  }
+}
+function showAuthErr(msg) { const e=document.getElementById('authError'); e.textContent=msg; e.style.display=''; }
+function doLogin()  {
+  S.isAdmin = true; sessionStorage.setItem(SESSION_KEY,'1');
+  closeModal('modalAuth'); updateAdminUI(); render(); showToast('✅ 已進入主辦人模式');
+}
+function doLogout() {
+  S.isAdmin = false; sessionStorage.removeItem(SESSION_KEY);
+  closeModal('modalLogout');
+  if (S.tab==='admin') S.tab='events';
+  updateAdminUI(); render(); showToast('已退出主辦人模式');
+}
+function updateAdminUI() {
+  document.getElementById('lockBtn').textContent = S.isAdmin ? '🔓' : '🔒';
+  document.getElementById('lockBtn').classList.toggle('admin', S.isAdmin);
+  document.getElementById('adminBadge').classList.toggle('hidden', !S.isAdmin);
+  document.getElementById('fab').classList.toggle('hidden', !S.isAdmin);
+  document.getElementById('nav-admin').classList.toggle('hidden', !S.isAdmin);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Render
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function render() {
+  const mc = document.getElementById('mainContent');
+  if (S.view==='calendar' && S.tab!=='admin') { mc.innerHTML = renderCal(); return; }
+  const map = { events:renderEvents, venues:renderVenues, courses:renderCourses, admin:renderAdmin };
+  mc.innerHTML = (map[S.tab]||renderEvents)();
+}
+function sh(t,c) { return `<div class="sec"><span class="sec-t">${t}</span><span class="sec-c">${c}</span></div>`; }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Events list
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderEvents() {
+  const t = today0();
+  const up   = S.events.filter(e=>e.date&&new Date(e.date+'T00:00:00')>=t).sort((a,b)=>a.date.localeCompare(b.date));
+  const past = S.events.filter(e=>!e.date||new Date(e.date+'T00:00:00')<t).sort((a,b)=>b.date.localeCompare(a.date));
+  let h = sh('即將舉行的活動', up.length);
+  h += up.length ? up.map(evCard).join('') : `<div class="empty">目前沒有即將舉行的活動${S.isAdmin?'<br>點右下角 ＋ 新增':''}</div>`;
+  if (past.length) {
+    h += `<div class="sec" style="margin-top:20px"><span class="sec-t" style="color:#9ca3af">過去的活動</span><span class="sec-c">${past.length}</span></div>`;
+    h += past.map(evCard).join('');
+  }
+  return h;
+}
+function evCard(e) {
+  const vn   = S.venues.find(v=>v.id===e.venueId);
+  const nm   = vn ? vn.name : '（未指定場地）';
+  const fee  = parseInt(e.totalFee)||0;
+  const lim  = parseInt(e.maxPeople)||0;
+  const pp   = lim>0&&fee>0 ? Math.ceil(fee/lim) : null;
+  const cnt  = signupCount(e.id);
+  const full = isFull(e.id, lim);
+  const clk  = S.isAdmin ? `openEvModal('${e.id}')` : `openDetail('${e.id}','event')`;
+  return `<div class="card" onclick="${clk}">
+    <div class="crow"><span class="ctitle">🏸 ${nm}</span><span class="cdate">${fmtDate(e.date)}</span></div>
+    <div class="crow"><span class="cmeta">${e.organizer?'📋 '+e.organizer:''}</span><span class="cmeta">${fmtTime(e.startTime)}${e.endTime?' – '+fmtTime(e.endTime):''}</span></div>
+    <div class="tags">
+      ${fee>0?`<span class="tag">💰 NT$${fee}</span>`:'<span class="tag free">免費</span>'}
+      ${pp?`<span class="tag">每人約 NT$${pp}</span>`:''}
+      ${vn&&vn.type==='indoor'?'<span class="tag indoor">室內</span>':''}
+      ${vn&&vn.type==='outdoor'?'<span class="tag outdoor">室外</span>':''}
+      ${full?'<span class="tag full">已額滿</span>':''}
+    </div>
+    ${e.note?`<div class="cmeta" style="margin-top:6px">📝 ${e.note}</div>`:''}
+    <div class="signup-bar">
+      <span class="signup-count">報名人數：${cnt}${lim>0?' / '+lim:''} 人</span>
+      <span class="signup-pill${full?' full':''}">${S.isAdmin?`名單 ${cnt} 人`:(full?'已額滿':'點此報名 →')}</span>
+    </div>
+  </div>`;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Venues list
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderVenues() {
+  const sorted = [...S.venues].sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant'));
+  let h = sh('場地總覽', sorted.length);
+  if (!sorted.length) return h+`<div class="empty">還沒有場地資料${S.isAdmin?'<br>點右下角 ＋ 新增':''}</div>`;
+  sorted.forEach(v => {
+    const clk = S.isAdmin ? `onclick="openVnModal('${v.id}')"` : '';
+    h += `<div class="card" ${clk} style="${S.isAdmin?'':'cursor:default'}">
+      <div class="crow"><span class="ctitle">${v.type==='indoor'?'🏠':'🌳'} ${v.name}</span>${v.isFree?'<span class="tag free">免費</span>':''}</div>
+      ${v.address?`<div class="cmeta">📍 ${v.address}</div>`:''}
+      <div class="tags">
+        ${v.type==='indoor'?'<span class="tag indoor">室內</span>':'<span class="tag outdoor">室外</span>'}
+        ${v.feeText?`<span class="tag">${v.feeText}</span>`:''}
+        ${v.limitText?`<span class="tag">👥 ${v.limitText}</span>`:''}
+      </div>
+      ${v.note?`<div class="cmeta" style="margin-top:6px">📝 ${v.note}</div>`:''}
+    </div>`;
+  });
+  return h;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Courses list
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderCourses() {
+  const t = today0();
+  const up   = S.courses.filter(c=>c.date&&new Date(c.date+'T00:00:00')>=t).sort((a,b)=>a.date.localeCompare(b.date));
+  const past = S.courses.filter(c=>!c.date||new Date(c.date+'T00:00:00')<t).sort((a,b)=>b.date.localeCompare(a.date));
+  let h = sh('即將開課的課程', up.length);
+  h += up.length ? up.map(coCard).join('') : `<div class="empty">目前沒有即將開課的課程${S.isAdmin?'<br>點右下角 ＋ 新增':''}</div>`;
+  if (past.length) {
+    h += `<div class="sec" style="margin-top:20px"><span class="sec-t" style="color:#9ca3af">過去的課程</span><span class="sec-c">${past.length}</span></div>`;
+    h += past.map(coCard).join('');
+  }
+  return h;
+}
+function coCard(c) {
+  const cnt  = signupCount(c.id);
+  const lim  = parseInt(c.maxPeople)||0;
+  const full = isFull(c.id, lim);
+  const clk  = S.isAdmin ? `openCoModal('${c.id}')` : `openDetail('${c.id}','course')`;
+  return `<div class="card" onclick="${clk}">
+    <div class="crow"><span class="ctitle">📚 ${c.courseName}</span><span class="cdate">${fmtDate(c.date)}</span></div>
+    <div class="crow"><span class="cmeta">${c.organizer?'📋 '+c.organizer:''}</span><span class="cmeta">${fmtTime(c.startTime)}${c.endTime?' – '+fmtTime(c.endTime):''}</span></div>
+    <div class="tags">
+      ${parseInt(c.fee)>0?`<span class="tag">💰 NT$${c.fee}</span>`:'<span class="tag free">免費</span>'}
+      ${c.courseLink?'<span class="tag">🔗 報名連結</span>':''}
+      ${full?'<span class="tag full">已額滿</span>':''}
+    </div>
+    ${c.note?`<div class="cmeta" style="margin-top:6px">📝 ${c.note}</div>`:''}
+    <div class="signup-bar">
+      <span class="signup-count">報名人數：${cnt}${lim>0?' / '+lim:''} 人</span>
+      <span class="signup-pill${full?' full':''}">${S.isAdmin?`名單 ${cnt} 人`:(full?'已額滿':'點此報名 →')}</span>
+    </div>
+  </div>`;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Admin panel
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderAdmin() {
+  const rows = [
+    { i:'＋', l:'建立新活動',   d:'設定場地、時間、費用',     f:'openEvModal()' },
+    { i:'📍', l:'新增場地',     d:'加入新的球場資料',         f:'openVnModal()' },
+    { i:'📚', l:'新增課程',     d:'開設教學課程供報名',       f:'openCoModal()' },
+    { i:'⇧',  l:'匯出報名資料', d:'下載所有報名名單備份',     f:'openExport()' },
+    { i:'⌫',  l:'清除所有資料', d:'刪除所有活動、場地與課程', f:'askClear()', red:true },
+  ];
+  return `<div class="sec"><span class="sec-t">主辦管理</span></div>` +
+    rows.map(r=>`<div class="admin-row" onclick="${r.f}">
+      <div class="admin-left"><span class="admin-icon">${r.i}</span>
+        <div><div class="admin-lbl"${r.red?' style="color:var(--red)"':''}>${r.l}</div><div class="admin-desc">${r.d}</div></div>
+      </div><span style="color:var(--muted)">›</span>
+    </div>`).join('');
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Calendar
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderCal() {
+  const yr=S.calMonth.getFullYear(), mo=S.calMonth.getMonth(), tod=new Date();
+  const first=new Date(yr,mo,1).getDay(), days=new Date(yr,mo+1,0).getDate();
+  const mns=['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  const evDates=new Set([...S.events.map(e=>e.date),...S.courses.map(c=>c.date)]);
+  let g='';
+  '日一二三四五六'.split('').forEach(d=>g+=`<div class="cal-dow">${d}</div>`);
+  for(let i=0;i<first;i++) g+=`<div class="cal-day empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const ds=`${yr}-${String(mo+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const iT=tod.getFullYear()===yr&&tod.getMonth()===mo&&tod.getDate()===d;
+    g+=`<div class="cal-day ${iT?'today':''} ${evDates.has(ds)?'has-event':''} ${S.calSel===ds?'selected':''}" onclick="calSel('${ds}')">${d}</div>`;
+  }
+  let panel='';
+  if (S.calSel) {
+    const devs=S.events.filter(e=>e.date===S.calSel), dcos=S.courses.filter(c=>c.date===S.calSel);
+    panel=`<div class="cal-events"><div style="font-size:13px;color:var(--muted);margin-bottom:8px">${fmtDate(S.calSel)} 的安排</div>`;
+    if(!devs.length&&!dcos.length) panel+=`<div style="text-align:center;color:#9ca3af;font-size:13px;padding:12px">當日無活動</div>`;
+    devs.forEach(e=>{
+      const vn=S.venues.find(v=>v.id===e.venueId);
+      const clk=S.isAdmin?`openEvModal('${e.id}')`:`openDetail('${e.id}','event')`;
+      panel+=`<div class="card" onclick="${clk}" style="margin-bottom:6px"><div style="font-weight:600;font-size:14px">🏸 ${vn?vn.name:'活動'}</div><div style="font-size:12px;color:var(--muted)">${fmtTime(e.startTime)}${e.endTime?' – '+fmtTime(e.endTime):''}</div></div>`;
+    });
+    dcos.forEach(c=>{
+      const clk=S.isAdmin?`openCoModal('${c.id}')`:`openDetail('${c.id}','course')`;
+      panel+=`<div class="card" onclick="${clk}" style="margin-bottom:6px"><div style="font-weight:600;font-size:14px">📚 ${c.courseName}</div><div style="font-size:12px;color:var(--muted)">${fmtTime(c.startTime)}${c.endTime?' – '+fmtTime(c.endTime):''}</div></div>`;
+    });
+    panel+=`</div>`;
+  } else {
+    panel=`<div class="cal-events"><div style="text-align:center;color:#9ca3af;font-size:13px;padding:12px">點選日期查看當日活動</div></div>`;
+  }
+  return `<div class="cal-wrap">
+    <div class="cal-nav">
+      <button class="cal-btn" onclick="calPrev()">‹</button>
+      <span class="cal-lbl">${yr} 年 ${mns[mo]}</span>
+      <button class="cal-today-btn" onclick="calToday()">今日</button>
+      <button class="cal-btn" onclick="calNext()">›</button>
+    </div>
+    <div class="cal-grid">${g}</div>${panel}
+  </div>`;
+}
+function calPrev()  { S.calMonth=new Date(S.calMonth.getFullYear(),S.calMonth.getMonth()-1,1); render(); }
+function calNext()  { S.calMonth=new Date(S.calMonth.getFullYear(),S.calMonth.getMonth()+1,1); render(); }
+function calToday() { S.calMonth=new Date(); S.calSel=null; render(); }
+function calSel(ds) { S.calSel=S.calSel===ds?null:ds; render(); }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Detail modal (participant)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openDetail(id, type) {
+  S.detailId=id; S.detailType=type;
+  const item = type==='event' ? S.events.find(e=>e.id===id) : S.courses.find(c=>c.id===id);
+  if (!item) return;
+  const lim=parseInt(item.maxPeople)||0, cnt=signupCount(id), full=isFull(id,lim);
+  let info='';
+  if (type==='event') {
+    const vn=S.venues.find(v=>v.id===item.venueId);
+    document.getElementById('detailTitle').textContent=`🏸 ${vn?vn.name:'羽球活動'}`;
+    if (vn)          info+=ir('場地',`${vn.type==='indoor'?'🏠':'🌳'} ${vn.name}`);
+    if (vn?.address) info+=ir('地址',`📍 ${vn.address}`);
+  } else {
+    document.getElementById('detailTitle').textContent=`📚 ${item.courseName}`;
+    if (item.courseLink) info+=ir('連結',`<a href="${item.courseLink}" target="_blank" style="color:var(--pink)">🔗 點此開啟</a>`);
+  }
+  if (item.date)      info+=ir('日期', fmtDate(item.date));
+  if (item.startTime) info+=ir('時間', `${fmtTime(item.startTime)}${item.endTime?' – '+fmtTime(item.endTime):''}`);
+  const fee=parseInt(type==='event'?item.totalFee:item.fee)||0;
+  if (type==='event') { const pp=lim>0&&fee>0?Math.ceil(fee/lim):null; info+=ir('場地費',fee>0?`NT$${fee}${pp?' (每人約 NT$'+pp+')':''}`:'免費'); }
+  else info+=ir('費用',fee>0?`NT$${fee} / 人`:'免費');
+  if (lim>0) {
+    const pct=Math.min(cnt/lim*100,100);
+    info+=`<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:4px">
+        <span style="color:var(--muted)">名額</span>
+        <span style="font-weight:500">${cnt} / ${lim} 人 ${full?'<span style="color:var(--red)">（額滿）</span>':''}</span>
+      </div>
+      <div class="cap-bar-wrap"><div class="cap-bar${full?' full':''}" style="width:${pct}%"></div></div>
+    </div>`;
+  } else {
+    info+=ir('名額',`${cnt} 人已報名（不限人數）`);
+  }
+  if (item.organizer) info+=ir('主辦', item.organizer);
+  if (item.note)      info+=ir('備註', item.note);
+  document.getElementById('detailInfo').innerHTML=info;
+
+  const btn=document.getElementById('signupBtn');
+  document.getElementById('signupName').value='';
+  document.getElementById('signupNote').value='';
+  document.getElementById('signupSectionTitle').textContent=full?'活動已額滿':'我要報名';
+  btn.disabled=full; btn.style.opacity=full?'.5':'1';
+  btn.textContent=full?'名額已滿，無法報名':'✅ 確認報名';
+  document.getElementById('signupSection').style.display='';
+
+  refreshDetailList();
+  openModal('modalDetail');
+}
+function ir(label,value) { return `<div class="info-row"><span class="info-label">${label}</span><span class="info-value">${value}</span></div>`; }
+function refreshDetailList() {
+  const list=S.signups[S.detailId]||[];
+  const el=document.getElementById('detailSignupList');
+  if (!list.length) { el.classList.add('hidden'); return; }
+  el.classList.remove('hidden');
+  el.innerHTML=`<div class="signup-list-title">已報名名單（${list.length} 人）</div>`+
+    list.map(r=>`<div class="signup-item">
+      <div><div class="signup-name">👤 ${r.name}</div>${r.note?`<div class="signup-note">${r.note}</div>`:''}</div>
+      <div class="signup-time">${fmtTs(r.createdAt)}</div>
+    </div>`).join('');
+}
+
+async function doSignup() {
+  const name=document.getElementById('signupName').value.trim();
+  if (!name) { alert('請填入您的姓名'); return; }
+  const item=S.detailType==='event'?S.events.find(e=>e.id===S.detailId):S.courses.find(c=>c.id===S.detailId);
+  if (isFull(S.detailId, item?.maxPeople)) { alert('很抱歉，名額已滿！'); return; }
+  const btn=document.getElementById('signupBtn');
+  btn.disabled=true; btn.textContent='報名中…';
+  try {
+    await COL.regs.add({ itemId:S.detailId, itemType:S.detailType, name, note:document.getElementById('signupNote').value.trim(), createdAt:firebase.firestore.FieldValue.serverTimestamp() });
+    document.getElementById('signupName').value='';
+    document.getElementById('signupNote').value='';
+    btn.textContent='🎉 報名成功！';
+    setTimeout(()=>{ btn.disabled=false; btn.textContent='✅ 確認報名'; },2000);
+  } catch(e) { alert('報名失敗，請重試'); btn.disabled=false; btn.textContent='✅ 確認報名'; }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Admin sign-up list
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function renderAdminSignupList(id, containerId) {
+  const list=S.signups[id]||[], el=document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML=`<div class="signup-list-title">報名名單（${list.length} 人）</div>`+
+    (list.length
+      ? list.map(r=>`<div class="signup-item">
+          <div><div class="signup-name">👤 ${r.name}</div>${r.note?`<div class="signup-note">📝 ${r.note}</div>`:''}<div class="signup-time">${fmtTs(r.createdAt)}</div></div>
+          <button class="signup-del" onclick="delSignup('${r.id}')">×</button>
+        </div>`).join('')
+      : `<div style="color:var(--muted);font-size:13px;padding:8px 0">目前沒有人報名</div>`);
+}
+async function delSignup(regId) {
+  if (!confirm('確定要移除此報名記錄？')) return;
+  try { await COL.regs.doc(regId).delete(); showToast('已移除'); }
+  catch(e) { alert('刪除失敗，請重試'); }
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Modal helpers
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openModal(id)  { document.getElementById(id).classList.remove('hidden'); }
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+document.querySelectorAll('.modal-overlay').forEach(el =>
+  el.addEventListener('click', e => { if(e.target===el) el.classList.add('hidden'); }));
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Event CRUD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openEvModal(id) {
+  S.editEvId=id||null;
+  const sel=document.getElementById('evVenue');
+  sel.innerHTML='<option value="">請選擇場地</option>';
+  S.venues.sort((a,b)=>a.name.localeCompare(b.name,'zh-Hant')).forEach(v=>sel.innerHTML+=`<option value="${v.id}">${v.name}</option>`);
+  const org=localStorage.getItem(K.organizer)||'';
+  if (id) {
+    const e=S.events.find(x=>x.id===id); if(!e) return;
+    document.getElementById('mEvTitle').textContent='編輯活動';
+    sel.value=e.venueId||''; document.getElementById('evOrg').value=e.organizer||'';
+    document.getElementById('evDate').value=e.date||''; document.getElementById('evStart').value=e.startTime||'';
+    document.getElementById('evEnd').value=e.endTime||''; document.getElementById('evFee').value=e.totalFee||'';
+    document.getElementById('evLimit').value=e.maxPeople||''; document.getElementById('evNote').value=e.note||'';
+    document.getElementById('btnDelEv').classList.remove('hidden');
+    renderAdminSignupList(id,'evSignupList');
+  } else {
+    document.getElementById('mEvTitle').textContent='建立新活動';
+    sel.value=''; document.getElementById('evOrg').value=org;
+    ['evDate','evStart','evEnd','evFee','evLimit','evNote'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('btnDelEv').classList.add('hidden');
+    document.getElementById('evSignupList').innerHTML='';
+  }
+  openModal('modalEvent');
+}
+function onVenueChange() {
+  if (S.editEvId) return;
+  const vn=S.venues.find(v=>v.id===document.getElementById('evVenue').value);
+  if (vn) {
+    if (vn.defaultFee)   document.getElementById('evFee').value=vn.defaultFee;
+    if (vn.defaultLimit) document.getElementById('evLimit').value=vn.defaultLimit;
+  }
+}
+async function saveEvent() {
+  const org=document.getElementById('evOrg').value.trim();
+  if (!org) { alert('請填入總召姓名'); return; }
+  localStorage.setItem(K.organizer,org);
+  const data={venueId:document.getElementById('evVenue').value,organizer:org,
+    date:document.getElementById('evDate').value,startTime:document.getElementById('evStart').value,
+    endTime:document.getElementById('evEnd').value,totalFee:document.getElementById('evFee').value,
+    maxPeople:document.getElementById('evLimit').value,note:document.getElementById('evNote').value.trim(),
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  setBtn('saveEvBtn','儲存中…',true);
+  try {
+    if (S.editEvId) await COL.events.doc(S.editEvId).update(data);
+    else { data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await COL.events.add(data); }
+    closeModal('modalEvent'); showToast('✅ 已儲存');
+  } catch(e) { alert('儲存失敗，請重試'); }
+  setBtn('saveEvBtn','儲存活動',false);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Venue CRUD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openVnModal(id) {
+  S.editVnId=id||null;
+  if (id) {
+    const v=S.venues.find(x=>x.id===id); if(!v) return;
+    document.getElementById('mVnTitle').textContent='編輯場地';
+    document.getElementById('vnName').value=v.name||''; document.getElementById('vnAddr').value=v.address||'';
+    setVType(v.type||'indoor'); document.getElementById('vnFeeText').value=v.feeText||'';
+    document.getElementById('vnDefFee').value=v.defaultFee||''; document.getElementById('vnDefLimit').value=v.defaultLimit||'';
+    document.getElementById('vnFree').checked=v.isFree||false;
+    document.getElementById('vnLimitText').value=v.limitText||''; document.getElementById('vnNote').value=v.note||'';
+    document.getElementById('btnDelVn').classList.remove('hidden');
+  } else {
+    document.getElementById('mVnTitle').textContent='新增場地';
+    ['vnName','vnAddr','vnFeeText','vnDefFee','vnDefLimit','vnLimitText','vnNote'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('vnFree').checked=false; setVType('indoor');
+    document.getElementById('btnDelVn').classList.add('hidden');
+  }
+  openModal('modalVenue');
+}
+function setVType(t) {
+  S.vType=t;
+  document.getElementById('ttIndoor').classList.toggle('active',t==='indoor');
+  document.getElementById('ttOutdoor').classList.toggle('active',t==='outdoor');
+}
+async function saveVenue() {
+  const name=document.getElementById('vnName').value.trim();
+  if (!name) { alert('請填入場地名稱'); return; }
+  const data={name,address:document.getElementById('vnAddr').value.trim(),type:S.vType,
+    feeText:document.getElementById('vnFeeText').value.trim(),defaultFee:document.getElementById('vnDefFee').value,
+    defaultLimit:document.getElementById('vnDefLimit').value,isFree:document.getElementById('vnFree').checked,
+    limitText:document.getElementById('vnLimitText').value.trim(),note:document.getElementById('vnNote').value.trim(),
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  setBtn('saveVnBtn','儲存中…',true);
+  try {
+    if (S.editVnId) await COL.venues.doc(S.editVnId).update(data);
+    else { data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await COL.venues.add(data); }
+    closeModal('modalVenue'); showToast('✅ 場地已儲存');
+  } catch(e) { alert('儲存失敗，請重試'); }
+  setBtn('saveVnBtn','儲存場地',false);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Course CRUD
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openCoModal(id) {
+  S.editCoId=id||null;
+  const org=localStorage.getItem(K.organizer)||'';
+  if (id) {
+    const c=S.courses.find(x=>x.id===id); if(!c) return;
+    document.getElementById('mCoTitle').textContent='編輯課程';
+    document.getElementById('coOrg').value=c.organizer||''; document.getElementById('coName').value=c.courseName||'';
+    document.getElementById('coLink').value=c.courseLink||''; document.getElementById('coDate').value=c.date||'';
+    document.getElementById('coStart').value=c.startTime||''; document.getElementById('coEnd').value=c.endTime||'';
+    document.getElementById('coFee').value=c.fee||''; document.getElementById('coLimit').value=c.maxPeople||'';
+    document.getElementById('coNote').value=c.note||'';
+    document.getElementById('btnDelCo').classList.remove('hidden');
+    renderAdminSignupList(id,'coSignupList');
+  } else {
+    document.getElementById('mCoTitle').textContent='新增課程';
+    document.getElementById('coOrg').value=org;
+    ['coName','coLink','coDate','coStart','coEnd','coFee','coLimit','coNote'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('btnDelCo').classList.add('hidden');
+    document.getElementById('coSignupList').innerHTML='';
+  }
+  openModal('modalCourse');
+}
+async function saveCourse() {
+  const org=document.getElementById('coOrg').value.trim(), name=document.getElementById('coName').value.trim();
+  if (!org)  { alert('請填入總召姓名'); return; }
+  if (!name) { alert('請填入課程名稱'); return; }
+  localStorage.setItem(K.organizer,org);
+  const data={organizer:org,courseName:name,courseLink:document.getElementById('coLink').value.trim(),
+    date:document.getElementById('coDate').value,startTime:document.getElementById('coStart').value,
+    endTime:document.getElementById('coEnd').value,fee:document.getElementById('coFee').value,
+    maxPeople:document.getElementById('coLimit').value,note:document.getElementById('coNote').value.trim(),
+    updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
+  setBtn('saveCoBtn','儲存中…',true);
+  try {
+    if (S.editCoId) await COL.courses.doc(S.editCoId).update(data);
+    else { data.createdAt=firebase.firestore.FieldValue.serverTimestamp(); await COL.courses.add(data); }
+    closeModal('modalCourse'); showToast('✅ 課程已儲存');
+  } catch(e) { alert('儲存失敗，請重試'); }
+  setBtn('saveCoBtn','儲存課程',false);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Delete / Confirm
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function confirmDel(type) {
+  const msgs={event:'確定要刪除此活動嗎？相關報名記錄也會一併刪除。',venue:'確定要刪除此場地嗎？',course:'確定要刪除此課程嗎？相關報名記錄也會一併刪除。'};
+  document.getElementById('confirmMsg').textContent=msgs[type];
+  S.confirmCb=async()=>{
+    try {
+      if (type==='event')  {
+        await COL.events.doc(S.editEvId).delete();
+        // Delete related registrations
+        const snap=await COL.regs.where('itemId','==',S.editEvId).get();
+        await Promise.all(snap.docs.map(d=>d.ref.delete()));
+        closeModal('modalEvent');
+      }
+      if (type==='venue')  { await COL.venues.doc(S.editVnId).delete(); closeModal('modalVenue'); }
+      if (type==='course') {
+        await COL.courses.doc(S.editCoId).delete();
+        const snap=await COL.regs.where('itemId','==',S.editCoId).get();
+        await Promise.all(snap.docs.map(d=>d.ref.delete()));
+        closeModal('modalCourse');
+      }
+      showToast('已刪除');
+    } catch(e) { alert('刪除失敗，請重試'); }
+  };
+  openModal('modalConfirm');
+}
+function askClear() {
+  document.getElementById('confirmMsg').textContent='確定要清除所有資料嗎？此操作無法復原，包含所有報名記錄。';
+  S.confirmCb=async()=>{
+    try {
+      const [ev,vn,co,rg]=await Promise.all([COL.events.get(),COL.venues.get(),COL.courses.get(),COL.regs.get()]);
+      await Promise.all([...ev.docs,...vn.docs,...co.docs,...rg.docs].map(d=>d.ref.delete()));
+      showToast('已清除所有資料');
+    } catch(e) { alert('清除失敗，請重試'); }
+  };
+  openModal('modalConfirm');
+}
+function onConfirmOk() { closeModal('modalConfirm'); if(S.confirmCb){S.confirmCb();S.confirmCb=null;} }
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Export (CSV + JSON)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+function openExport() {
+  // Build a CSV-friendly text of all sign-ups
+  const lines=['活動/課程\t日期\t姓名\t備註\t報名時間'];
+  S.events.forEach(e => {
+    const vn=S.venues.find(v=>v.id===e.venueId);
+    const nm=vn?vn.name:'活動';
+    (S.signups[e.id]||[]).forEach(r=>lines.push(`🏸 ${nm}\t${e.date||''}\t${r.name}\t${r.note||''}\t${fmtTs(r.createdAt)}`));
+  });
+  S.courses.forEach(c => {
+    (S.signups[c.id]||[]).forEach(r=>lines.push(`📚 ${c.courseName}\t${c.date||''}\t${r.name}\t${r.note||''}\t${fmtTs(r.createdAt)}`));
+  });
+  document.getElementById('exportData').value=lines.join('\n');
+  openModal('modalExport');
+}
+function doCopy() {
+  const txt=document.getElementById('exportData').value;
+  navigator.clipboard.writeText(txt).then(()=>showToast('已複製到剪貼簿！')).catch(()=>{
+    document.getElementById('exportData').select(); document.execCommand('copy'); showToast('已複製到剪貼簿！');
+  });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+//  Boot
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+S.isAdmin = !!sessionStorage.getItem(SESSION_KEY);
+updateAdminUI();
+startListening();
+</script>
+</body>
+</html>
