@@ -484,12 +484,14 @@ const COL = {
   venues:  db.collection('venues'),
   courses: db.collection('courses'),
   regs:    db.collection('registrations'),
+  config:  db.collection('config'),
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 //  State
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const K = { organizer: 'lpz_organizer', password: 'lpz_password' };
+const K = { organizer: 'lpz_organizer' };
+const ADMIN_DOC = () => COL.config.doc('admin'); // 密碼存在 Firestore，不存在瀏覽器
 const SESSION_KEY = 'lpz_admin_session';
 
 const S = {
@@ -615,20 +617,45 @@ function onFab() {
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Auth
+//  Auth（密碼存在 Firebase，不是瀏覽器）
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function hasPassword() { return !!localStorage.getItem(K.password); }
-function checkPw(pw)   { return localStorage.getItem(K.password) === pw; }
-function setPw(pw)     { localStorage.setItem(K.password, pw); }
+async function getAdminDoc() {
+  try { return await ADMIN_DOC().get(); } catch(e) { return null; }
+}
+async function hasPassword() {
+  const doc = await getAdminDoc();
+  return !!(doc && doc.exists && doc.data()?.password);
+}
+async function checkPw(pw) {
+  const doc = await getAdminDoc();
+  return !!(doc && doc.exists && doc.data()?.password === pw);
+}
+async function setPw(pw) {
+  await ADMIN_DOC().set({ password: pw }, { merge: true });
+}
 
 function onLockClick() {
   if (S.isAdmin) { openModal('modalLogout'); return; }
   openAuthModal();
 }
-function openAuthModal() {
+async function openAuthModal() {
   document.getElementById('authError').style.display = 'none';
   document.getElementById('authPw').value = '';
-  if (!hasPassword()) {
+  // 先顯示 modal 並顯示 loading 狀態
+  document.getElementById('authTitle').textContent = '主辦人登入';
+  document.getElementById('authIcon').textContent  = '⏳';
+  document.getElementById('authLbl').textContent   = '驗證中…';
+  document.getElementById('authPwWrap').classList.add('hidden');
+  document.getElementById('authNewPwWrap').classList.add('hidden');
+  document.getElementById('authConfirmWrap').classList.add('hidden');
+  document.getElementById('authSubmitBtn').textContent = '請稍候';
+  document.getElementById('authSubmitBtn').disabled = true;
+  openModal('modalAuth');
+
+  const hasPw = await hasPassword();
+  document.getElementById('authSubmitBtn').disabled = false;
+
+  if (!hasPw) {
     document.getElementById('authTitle').textContent = '設定主辦人密碼';
     document.getElementById('authIcon').textContent  = '🔑';
     document.getElementById('authLbl').textContent   = '首次使用，請設定主辦人密碼';
@@ -638,6 +665,7 @@ function openAuthModal() {
     document.getElementById('authNewPw').value = '';
     document.getElementById('authConfirmPw').value = '';
     document.getElementById('authSubmitBtn').textContent = '設定密碼';
+    setTimeout(() => { try { document.getElementById('authNewPw').focus(); } catch(e){} }, 100);
   } else {
     document.getElementById('authTitle').textContent = '主辦人登入';
     document.getElementById('authIcon').textContent  = '🔒';
@@ -646,23 +674,26 @@ function openAuthModal() {
     document.getElementById('authNewPwWrap').classList.add('hidden');
     document.getElementById('authConfirmWrap').classList.add('hidden');
     document.getElementById('authSubmitBtn').textContent = '登入';
+    setTimeout(() => { try { document.getElementById('authPw').focus(); } catch(e){} }, 100);
   }
-  openModal('modalAuth');
-  setTimeout(() => { try { (hasPassword() ? document.getElementById('authPw') : document.getElementById('authNewPw')).focus(); } catch(e){} }, 300);
 }
-function onAuthSubmit() {
+async function onAuthSubmit() {
   const errEl = document.getElementById('authError');
   errEl.style.display = 'none';
-  if (!hasPassword()) {
+  document.getElementById('authSubmitBtn').disabled = true;
+  const hasPw = await hasPassword();
+  if (!hasPw) {
     const np = document.getElementById('authNewPw').value;
     const cp = document.getElementById('authConfirmPw').value;
-    if (!np) { showAuthErr('請輸入密碼'); return; }
-    if (np.length < 4) { showAuthErr('密碼至少需要 4 個字元'); return; }
-    if (np !== cp)  { showAuthErr('兩次密碼不一致'); return; }
-    setPw(np); doLogin();
+    if (!np) { showAuthErr('請輸入密碼'); document.getElementById('authSubmitBtn').disabled=false; return; }
+    if (np.length < 4) { showAuthErr('密碼至少需要 4 個字元'); document.getElementById('authSubmitBtn').disabled=false; return; }
+    if (np !== cp) { showAuthErr('兩次密碼不一致'); document.getElementById('authSubmitBtn').disabled=false; return; }
+    try { await setPw(np); doLogin(); }
+    catch(e) { showAuthErr('設定失敗，請重試'); document.getElementById('authSubmitBtn').disabled=false; }
   } else {
     const pw = document.getElementById('authPw').value;
-    if (!checkPw(pw)) { showAuthErr('密碼錯誤，請重試'); return; }
+    const ok = await checkPw(pw);
+    if (!ok) { showAuthErr('密碼錯誤，請重試'); document.getElementById('authSubmitBtn').disabled=false; return; }
     doLogin();
   }
 }
@@ -1151,38 +1182,4 @@ function askClear() {
   };
   openModal('modalConfirm');
 }
-function onConfirmOk() { closeModal('modalConfirm'); if(S.confirmCb){S.confirmCb();S.confirmCb=null;} }
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Export (CSV + JSON)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function openExport() {
-  // Build a CSV-friendly text of all sign-ups
-  const lines=['活動/課程\t日期\t姓名\t備註\t報名時間'];
-  S.events.forEach(e => {
-    const vn=S.venues.find(v=>v.id===e.venueId);
-    const nm=vn?vn.name:'活動';
-    (S.signups[e.id]||[]).forEach(r=>lines.push(`🏸 ${nm}\t${e.date||''}\t${r.name}\t${r.note||''}\t${fmtTs(r.createdAt)}`));
-  });
-  S.courses.forEach(c => {
-    (S.signups[c.id]||[]).forEach(r=>lines.push(`📚 ${c.courseName}\t${c.date||''}\t${r.name}\t${r.note||''}\t${fmtTs(r.createdAt)}`));
-  });
-  document.getElementById('exportData').value=lines.join('\n');
-  openModal('modalExport');
-}
-function doCopy() {
-  const txt=document.getElementById('exportData').value;
-  navigator.clipboard.writeText(txt).then(()=>showToast('已複製到剪貼簿！')).catch(()=>{
-    document.getElementById('exportData').select(); document.execCommand('copy'); showToast('已複製到剪貼簿！');
-  });
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-//  Boot
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-S.isAdmin = !!sessionStorage.getItem(SESSION_KEY);
-updateAdminUI();
-startListening();
-</script>
-</body>
-</html>
+function onConfirmOk() { closeModal('modalConfir
